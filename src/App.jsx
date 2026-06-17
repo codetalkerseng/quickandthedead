@@ -8,6 +8,7 @@ import Board from './pages/Board';
 import BootHill from './pages/BootHill';
 import Match from './pages/Match';
 import Admin from './pages/Admin';
+import Leaderboard from './pages/Leaderboard';
 import SheriffStar from './components/ui/SheriffStar';
 
 function NavBar() {
@@ -18,9 +19,9 @@ function NavBar() {
   if (!currentUser || !userProfile || hidden.includes(location.pathname)) return null;
 
   const links = [
-    { to: '/board',     label: 'Roster' },
-    { to: '/boot-hill', label: 'Boot Hill' },
-    { to: '/profile',   label: 'Profile' },
+    { to: '/board',       label: 'Roster' },
+    { to: '/leaderboard', label: 'Standings' },
+    { to: '/profile',     label: 'Profile' },
     ...(userProfile.isAdmin ? [{ to: '/admin', label: "Sheriff's" }] : []),
   ];
 
@@ -73,6 +74,7 @@ function AppShell() {
         <Route path="/board"      element={<ProtectedRoute><Board /></ProtectedRoute>} />
         <Route path="/boot-hill"  element={<ProtectedRoute><BootHill /></ProtectedRoute>} />
         <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/leaderboard"    element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
         <Route path="/match/:matchId" element={<ProtectedRoute><Match /></ProtectedRoute>} />
         <Route path="/admin"      element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
 

@@ -63,6 +63,30 @@ export function playGong() {
   } catch {}
 }
 
+// Warning chimes — called at 2 min, 1 min, and 30 sec thresholds.
+// `repeats` controls urgency: 1 = gentle, 2 = notable, 3 = urgent.
+export function playWarning(repeats = 1) {
+  try {
+    const ac = getCtx();
+    const now = ac.currentTime;
+    const freq = repeats === 1 ? 660 : repeats === 2 ? 880 : 1047;
+    for (let i = 0; i < repeats; i++) {
+      const t = now + i * 0.45;
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.5, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+      osc.start(t);
+      osc.stop(t + 0.75);
+    }
+  } catch {}
+}
+
 export function playTick() {
   try {
     const ac = getCtx();

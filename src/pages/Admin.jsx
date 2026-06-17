@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/firebase';
+import { resolveMatch } from '../lib/matchUtils';
 import { useAuth } from '../contexts/AuthContext';
 import PlayerAvatar from '../components/ui/PlayerAvatar';
 import SheriffStar from '../components/ui/SheriffStar';
@@ -73,63 +74,11 @@ function MatchesPanel() {
 
   async function resolve(match, type, winnerId = null) {
     setBusy(match.id);
-    const batch = writeBatch(db);
-
-    const cId = match.participants.challengerId;
-    const dId = match.participants.defenderId;
-    const cNick = match.participants.challengerNickname;
-    const dNick = match.participants.defenderNickname;
-    const wNick = winnerId === cId ? cNick : dNick;
-    const lNick = wNick === cNick ? dNick : cNick;
-
-    const logMessage =
-      type === 'tie'   ? `Double Elimination — ${cNick} and ${dNick} both fall!` :
-      type === 'yield' ? `${lNick} yields to ${wNick}!` :
-      type === 'cancel' ? `The duel between ${cNick} and ${dNick} was cancelled.` :
-                          `${wNick} sends ${lNick} to Boot Hill!`;
-
-    batch.update(doc(db, 'matches', match.id), {
-      status: type === 'cancel' ? 'cancelled' : 'resolved',
-      result: { winnerId, type, logMessage },
-    });
-
-    if (type === 'cancel') {
-      await batch.commit();
+    try {
+      await resolveMatch(match, type, winnerId);
+    } finally {
       setBusy(null);
-      return;
     }
-
-    const now = serverTimestamp();
-
-    if (type === 'tie') {
-      [{ id: cId, opp: dNick }, { id: dId, opp: cNick }].forEach(({ id, opp }) => {
-        batch.update(doc(db, 'profiles', id), {
-          status: 'eliminated',
-          'stats.matchesPlayed': increment(1),
-          'stats.lastMatchTime': now,
-          'stats.lastOpponentNickname': opp,
-        });
-      });
-    } else {
-      const loserId = winnerId === cId ? dId : cId;
-      const winnerOpp = winnerId === cId ? dNick : cNick;
-      const loserOpp = winnerId === cId ? cNick : dNick;
-
-      batch.update(doc(db, 'profiles', winnerId), {
-        'stats.matchesPlayed': increment(1),
-        'stats.lastMatchTime': now,
-        'stats.lastOpponentNickname': winnerOpp,
-      });
-      batch.update(doc(db, 'profiles', loserId), {
-        status: 'eliminated',
-        'stats.matchesPlayed': increment(1),
-        'stats.lastMatchTime': now,
-        'stats.lastOpponentNickname': loserOpp,
-      });
-    }
-
-    await batch.commit();
-    setBusy(null);
   }
 
   async function adjustClock(match) {
@@ -545,16 +494,16 @@ function TournamentPanel() {
 // ─── Seed data ────────────────────────────────────────────────────────────────
 
 const SEED_PLAYERS = [
-  { uid: 'test_ellen',    name: 'Sharon Stone',    nickname: 'The Lady',      align: 'ellen',    hand: 'right', status: 'alive',        duels: 2, lastMatchMinsAgo: 20 },
-  { uid: 'test_herod',    name: 'Gene Hackman',    nickname: 'Herod',         align: 'herod',    hand: 'right', status: 'alive',        duels: 5, lastMatchMinsAgo: 12 },
-  { uid: 'test_cort',     name: 'Russell Crowe',   nickname: 'Cort',          align: 'cort',     hand: 'left',  status: 'alive',        duels: 3, lastMatchMinsAgo: 52 },
-  { uid: 'test_kid',      name: 'Leonardo DiCaprio', nickname: 'The Kid',     align: 'kid',      hand: 'right', status: 'alive',        duels: 1, lastMatchMinsAgo: 48 },
-  { uid: 'test_hanlon',   name: 'Lance Henriksen', nickname: 'Ace Hanlon',    align: 'hanlon',   hand: 'right', status: 'alive',        duels: 0, lastMatchMinsAgo: null },
-  { uid: 'test_cantrell', name: 'Keith David',     nickname: 'Cantrell',      align: 'cantrell', hand: 'right', status: 'alive',        duels: 4, lastMatchMinsAgo: 30 },
-  { uid: 'test_spotted',  name: 'Jonothon Gill',   nickname: 'Spotted Horse', align: 'spotted',  hand: 'left',  status: 'alive',        duels: 1, lastMatchMinsAgo: 61 },
-  { uid: 'test_scars',    name: 'Mark Boone Jr.',  nickname: 'Scars',         align: 'scars',    hand: 'right', status: 'alive',        duels: 2, lastMatchMinsAgo: 38 },
-  { uid: 'test_kelly',    name: 'Tobin Bell',      nickname: 'Kelly',         align: 'kelly',    hand: 'right', status: 'eliminated',   duels: 2, lastMatchMinsAgo: 90, lastOpp: 'Herod' },
-  { uid: 'test_gutzon',   name: 'Sven-Ole Thorsen', nickname: 'Gutzon',       align: 'gutzon',   hand: 'right', status: 'disqualified', duels: 1, lastMatchMinsAgo: 70, lastOpp: 'The Lady' },
+  { uid: 'test_ellen',    name: 'Sharon Stone',      nickname: 'The Lady',      align: 'ellen',    hand: 'right', status: 'alive',        duels: 2, wins: 2, lastMatchMinsAgo: 20 },
+  { uid: 'test_herod',    name: 'Gene Hackman',      nickname: 'Herod',         align: 'herod',    hand: 'right', status: 'alive',        duels: 5, wins: 4, lastMatchMinsAgo: 12 },
+  { uid: 'test_cort',     name: 'Russell Crowe',     nickname: 'Cort',          align: 'cort',     hand: 'left',  status: 'alive',        duels: 3, wins: 2, lastMatchMinsAgo: 52 },
+  { uid: 'test_kid',      name: 'Leonardo DiCaprio', nickname: 'The Kid',       align: 'kid',      hand: 'right', status: 'alive',        duels: 1, wins: 1, lastMatchMinsAgo: 48 },
+  { uid: 'test_hanlon',   name: 'Lance Henriksen',   nickname: 'Ace Hanlon',    align: 'hanlon',   hand: 'right', status: 'alive',        duels: 0, wins: 0, lastMatchMinsAgo: null },
+  { uid: 'test_cantrell', name: 'Keith David',       nickname: 'Cantrell',      align: 'cantrell', hand: 'right', status: 'alive',        duels: 4, wins: 3, lastMatchMinsAgo: 30 },
+  { uid: 'test_spotted',  name: 'Jonothon Gill',     nickname: 'Spotted Horse', align: 'spotted',  hand: 'left',  status: 'alive',        duels: 1, wins: 1, lastMatchMinsAgo: 61 },
+  { uid: 'test_scars',    name: 'Mark Boone Jr.',    nickname: 'Scars',         align: 'scars',    hand: 'right', status: 'alive',        duels: 2, wins: 1, lastMatchMinsAgo: 38 },
+  { uid: 'test_kelly',    name: 'Tobin Bell',        nickname: 'Kelly',         align: 'kelly',    hand: 'right', status: 'eliminated',   duels: 2, wins: 1, lastMatchMinsAgo: 90, lastOpp: 'Herod' },
+  { uid: 'test_gutzon',   name: 'Sven-Ole Thorsen',  nickname: 'Gutzon',        align: 'gutzon',   hand: 'right', status: 'disqualified', duels: 1, wins: 0, lastMatchMinsAgo: 70, lastOpp: 'The Lady' },
 ];
 
 async function seedTestPlayers() {
@@ -575,9 +524,10 @@ async function seedTestPlayers() {
       status: p.status,
       isAdmin: false,
       stats: {
-        joinedAt: Timestamp.fromMillis(now - 120 * 60_000), // joined 2 hrs ago
+        joinedAt: Timestamp.fromMillis(now - 120 * 60_000),
         lastMatchTime,
         matchesPlayed: p.duels,
+        wins: p.wins ?? 0,
         ...(p.lastOpp ? { lastOpponentNickname: p.lastOpp } : {}),
       },
     });

@@ -4,6 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useServerTimeOffset } from '../hooks/useServerTimeOffset';
+import { resolveMatch } from '../lib/matchUtils';
 import CountdownClock from '../components/CountdownClock';
 import SafetyGate from '../components/SafetyGate';
 import PlayerAvatar from '../components/ui/PlayerAvatar';
@@ -11,13 +12,15 @@ import SheriffStar from '../components/ui/SheriffStar';
 import RopeDivider from '../components/ui/RopeDivider';
 import { ArrowLeft, Trophy } from 'lucide-react';
 
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
 function PhaseLabel({ phase }) {
   const map = {
-    announced: { text: 'Duel Scheduled', color: 'text-dust-400', bg: 'bg-charcoal-800' },
-    warning:   { text: 'Approach Staging Area', color: 'text-gold-400', bg: 'bg-charcoal-900' },
-    countdown: { text: 'Final Countdown', color: 'text-blood-400', bg: 'bg-charcoal-900' },
-    fire:      { text: 'Active Fire!', color: 'text-blood-300', bg: 'bg-blood-900' },
-    afterfire: { text: 'Awaiting Result', color: 'text-dust-500', bg: 'bg-charcoal-900' },
+    announced: { text: 'Duel Scheduled',         color: 'text-dust-400',   bg: 'bg-charcoal-800' },
+    warning:   { text: 'Approach Staging Area',   color: 'text-gold-400',   bg: 'bg-charcoal-900' },
+    countdown: { text: 'Final Countdown',         color: 'text-blood-400',  bg: 'bg-charcoal-900' },
+    fire:      { text: 'Active Fire!',            color: 'text-blood-300',  bg: 'bg-blood-900'    },
+    afterfire: { text: 'Awaiting Result',         color: 'text-dust-500',   bg: 'bg-charcoal-900' },
   };
   const info = map[phase] ?? map.announced;
   return (
@@ -29,14 +32,14 @@ function PhaseLabel({ phase }) {
   );
 }
 
-function ParticipantCard({ profile, label, isWinner }) {
+function ParticipantCard({ profile, label, isWinner, large }) {
   return (
-    <div className={`flex flex-col items-center gap-2 flex-1 p-3 rounded-sm transition-all ${
+    <div className={`flex flex-col items-center gap-1 flex-1 p-2 rounded-sm transition-all ${
       isWinner ? 'bg-gold-600/20 border border-gold-500' : ''
     }`}>
-      <p className="section-label text-dust-600 text-[10px]">{label}</p>
-      <PlayerAvatar profile={profile} size="lg" />
-      <p className="font-sans font-bold text-parchment-100 text-sm uppercase tracking-wide text-center">
+      <p className="section-label text-dust-600 text-[9px]">{label}</p>
+      <PlayerAvatar profile={profile} size={large ? 'lg' : 'md'} />
+      <p className={`font-sans font-bold text-parchment-100 uppercase tracking-wide text-center truncate w-full ${large ? 'text-base' : 'text-sm'}`}>
         {profile?.personal?.nickname ?? '…'}
       </p>
       {isWinner && (
@@ -49,17 +52,94 @@ function ParticipantCard({ profile, label, isWinner }) {
   );
 }
 
+// Resolve controls — shown to admins when match is unresolved
+function AdminResolveControls({ match, onResolved }) {
+  const [busy, setBusy] = useState(null);
+
+  async function handle(type, winnerId = null) {
+    setBusy(type + (winnerId ?? ''));
+    try {
+      await resolveMatch(match, type, winnerId);
+      onResolved?.();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const cId   = match.participants.challengerId;
+  const dId   = match.participants.defenderId;
+  const cNick = match.participants.challengerNickname;
+  const dNick = match.participants.defenderNickname;
+  const isBusy = busy !== null;
+
+  return (
+    <div className="bg-charcoal-800 border-t-2 border-blood-700 p-4">
+      <p className="section-label text-blood-500 mb-3 text-center">Sheriff — Resolve Match</p>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => handle('win', cId)}
+          disabled={isBusy}
+          className="btn-blood text-xs py-3 truncate"
+        >
+          ✓ {cNick}
+        </button>
+        <button
+          onClick={() => handle('win', dId)}
+          disabled={isBusy}
+          className="btn-blood text-xs py-3 truncate"
+        >
+          ✓ {dNick}
+        </button>
+        <button
+          onClick={() => handle('yield', dId)}
+          disabled={isBusy}
+          className="btn-ghost text-xs py-2"
+        >
+          {cNick} Yields
+        </button>
+        <button
+          onClick={() => handle('yield', cId)}
+          disabled={isBusy}
+          className="btn-ghost text-xs py-2"
+        >
+          {dNick} Yields
+        </button>
+        <button
+          onClick={() => handle('tie')}
+          disabled={isBusy}
+          className="bg-charcoal-700 hover:bg-charcoal-600 border border-charcoal-500 text-dust-300
+                     font-sans font-bold uppercase tracking-widest text-xs py-2 rounded-sm transition-colors"
+        >
+          Tie / Double Elim
+        </button>
+        <button
+          onClick={() => handle('cancel')}
+          disabled={isBusy}
+          className="bg-transparent hover:bg-charcoal-700 border border-charcoal-600 text-dust-600
+                     font-sans font-bold uppercase tracking-widest text-xs py-2 rounded-sm transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+      {isBusy && (
+        <p className="font-body text-dust-500 text-xs text-center mt-2">Updating records…</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Match() {
   const { matchId } = useParams();
   const { userProfile } = useAuth();
   const navigate = useNavigate();
   const serverOffset = useServerTimeOffset();
 
-  const [match, setMatch] = useState(null);
+  const [match, setMatch]                   = useState(null);
   const [challengerProfile, setChallengerProfile] = useState(null);
-  const [defenderProfile, setDefenderProfile] = useState(null);
-  const [phase, setPhase] = useState('announced');
-  const [showSafety, setShowSafety] = useState(false);
+  const [defenderProfile,   setDefenderProfile]   = useState(null);
+  const [phase, setPhase]                   = useState('announced');
 
   useEffect(() => {
     return onSnapshot(doc(db, 'matches', matchId), (snap) => {
@@ -67,18 +147,13 @@ export default function Match() {
     });
   }, [matchId]);
 
-  // Load participant profiles
   useEffect(() => {
     if (!match) return;
-    const unsub1 = onSnapshot(
-      doc(db, 'profiles', match.participants.challengerId),
-      (s) => s.exists() && setChallengerProfile({ uid: s.id, ...s.data() })
-    );
-    const unsub2 = onSnapshot(
-      doc(db, 'profiles', match.participants.defenderId),
-      (s) => s.exists() && setDefenderProfile({ uid: s.id, ...s.data() })
-    );
-    return () => { unsub1(); unsub2(); };
+    const u1 = onSnapshot(doc(db, 'profiles', match.participants.challengerId),
+      (s) => s.exists() && setChallengerProfile({ uid: s.id, ...s.data() }));
+    const u2 = onSnapshot(doc(db, 'profiles', match.participants.defenderId),
+      (s) => s.exists() && setDefenderProfile({ uid: s.id, ...s.data() }));
+    return () => { u1(); u2(); };
   }, [match?.participants?.challengerId, match?.participants?.defenderId]);
 
   if (!match) {
@@ -92,77 +167,77 @@ export default function Match() {
   const isParticipant =
     userProfile?.uid === match.participants.challengerId ||
     userProfile?.uid === match.participants.defenderId;
+  const isAdmin = userProfile?.isAdmin === true;
 
-  const participantKey =
-    userProfile?.uid === match.participants.challengerId ? 'challenger' : 'defender';
-
-  const myReadyKey = `${participantKey}Ready`;
-  const iHaveCleared = match.safety?.[myReadyKey] === true;
+  const participantKey = userProfile?.uid === match.participants.challengerId ? 'challenger' : 'defender';
+  const iHaveCleared   = match.safety?.[`${participantKey}Ready`] === true;
 
   const resolved = match.status === 'resolved' || match.status === 'cancelled';
   const winnerId = match.result?.winnerId;
 
-  // Show safety gate for participants during warning/countdown who haven't cleared yet
   const needsSafety = isParticipant && !iHaveCleared && !resolved &&
     (phase === 'warning' || phase === 'countdown');
+
+  // Show admin controls once fire phase begins (or during after-fire) if not yet resolved
+  const showAdminControls = isAdmin && !resolved &&
+    (phase === 'fire' || phase === 'afterfire' || phase === 'countdown');
 
   const bgClass = phase === 'fire' ? 'bg-blood-950' : 'bg-charcoal-900';
 
   return (
-    <div className={`min-h-screen ${bgClass} transition-colors duration-500`}>
+    <div className={`min-h-screen ${bgClass} transition-colors duration-500 flex flex-col`}>
       {needsSafety && (
         <SafetyGate
           matchId={matchId}
           participantKey={participantKey}
-          onReady={() => setShowSafety(false)}
+          onReady={() => {}}
         />
       )}
 
-      <PhaseLabel phase={resolved ? 'afterfire' : phase} />
+      <PhaseLabel phase={resolved ? (match.status === 'cancelled' ? 'afterfire' : 'afterfire') : phase} />
 
-      <div className="max-w-md mx-auto px-4 pt-6 pb-24">
-        {/* VS Header */}
-        <div className="flex items-stretch gap-2 mb-6">
-          <ParticipantCard
-            profile={challengerProfile}
-            label="Challenger"
-            isWinner={resolved && winnerId === match.participants.challengerId}
-          />
+      {/* Participants */}
+      <div className="flex items-stretch gap-2 px-4 pt-4 max-w-lg mx-auto w-full">
+        <ParticipantCard
+          profile={challengerProfile}
+          label="Challenger"
+          isWinner={resolved && winnerId === match.participants.challengerId}
+          large
+        />
+        <div className="flex flex-col items-center justify-center px-2 flex-shrink-0">
+          <SheriffStar size={18} />
+          <p className="font-display text-dust-600 text-sm mt-1">VS</p>
+        </div>
+        <ParticipantCard
+          profile={defenderProfile}
+          label="Defender"
+          isWinner={resolved && winnerId === match.participants.defenderId}
+          large
+        />
+      </div>
 
-          <div className="flex flex-col items-center justify-center px-2">
-            <SheriffStar size={20} />
-            <p className="font-display text-dust-500 text-lg mt-1">VS</p>
-          </div>
-
-          <ParticipantCard
-            profile={defenderProfile}
-            label="Defender"
-            isWinner={resolved && winnerId === match.participants.defenderId}
+      {/* ── BIG CLOCK ── */}
+      {!resolved && match.timing?.scheduledTime && (
+        <div className="flex-1 flex items-center justify-center px-4 py-6">
+          <CountdownClock
+            scheduledTime={match.timing.scheduledTime}
+            serverOffset={serverOffset}
+            onPhaseChange={setPhase}
+            large
           />
         </div>
+      )}
 
-        <RopeDivider />
-
-        {/* Clock */}
-        {!resolved && match.timing?.scheduledTime && (
-          <div className="my-8">
-            <CountdownClock
-              scheduledTime={match.timing.scheduledTime}
-              serverOffset={serverOffset}
-              onPhaseChange={setPhase}
-            />
-          </div>
-        )}
-
-        {/* Resolved result */}
-        {resolved && (
-          <div className="text-center py-6">
+      {/* Resolved result */}
+      {resolved && (
+        <div className="flex-1 flex items-center justify-center px-4">
+          <div className="text-center">
             {match.result?.type === 'tie' ? (
-              <p className="font-display text-blood-400 text-2xl">Double Elimination</p>
+              <p className="font-display text-blood-400 text-4xl">Double Elimination</p>
             ) : match.status === 'cancelled' ? (
-              <p className="font-display text-dust-500 text-2xl">Duel Cancelled</p>
+              <p className="font-display text-dust-500 text-4xl">Duel Cancelled</p>
             ) : (
-              <p className="font-display text-gold-400 text-2xl">
+              <p className="font-display text-gold-400 text-4xl">
                 {winnerId === match.participants.challengerId
                   ? match.participants.challengerNickname
                   : match.participants.defenderNickname}{' '}
@@ -170,37 +245,45 @@ export default function Match() {
               </p>
             )}
             {match.result?.logMessage && (
-              <p className="font-body text-dust-500 text-sm italic mt-2">{match.result.logMessage}</p>
+              <p className="font-body text-dust-500 text-sm italic mt-3">{match.result.logMessage}</p>
             )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Safety status strip for participants */}
-        {isParticipant && !resolved && (
-          <div className="mt-4 flex gap-2">
-            {[
-              { key: 'challengerReady', label: match.participants.challengerNickname },
-              { key: 'defenderReady',   label: match.participants.defenderNickname },
-            ].map(({ key, label }) => (
-              <div
-                key={key}
-                className={`flex-1 text-center py-2 rounded-sm border text-xs font-sans font-bold uppercase tracking-widest ${
-                  match.safety?.[key]
-                    ? 'bg-blood-900 border-blood-600 text-blood-300'
-                    : 'bg-charcoal-800 border-charcoal-600 text-dust-600'
-                }`}
-              >
-                {match.safety?.[key] ? '✓ ' : '○ '}{label}
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Safety status strip for participants */}
+      {isParticipant && !resolved && (
+        <div className="flex gap-2 px-4 pb-2 max-w-lg mx-auto w-full">
+          {[
+            { key: 'challengerReady', label: match.participants.challengerNickname },
+            { key: 'defenderReady',   label: match.participants.defenderNickname },
+          ].map(({ key, label }) => (
+            <div
+              key={key}
+              className={`flex-1 text-center py-1.5 rounded-sm border text-xs font-sans font-bold uppercase tracking-widest ${
+                match.safety?.[key]
+                  ? 'bg-blood-900 border-blood-600 text-blood-300'
+                  : 'bg-charcoal-800 border-charcoal-600 text-dust-600'
+              }`}
+            >
+              {match.safety?.[key] ? '✓ ' : '○ '}{label}
+            </div>
+          ))}
+        </div>
+      )}
 
-        <RopeDivider />
+      {/* Admin resolve controls */}
+      {showAdminControls && (
+        <AdminResolveControls match={match} onResolved={() => {}} />
+      )}
 
-        <button onClick={() => navigate('/board')} className="btn-ghost w-full flex items-center justify-center gap-2 text-sm">
-          <ArrowLeft size={14} />
-          Back to Roster
+      {/* Back button — sticky at very bottom */}
+      <div className="px-4 py-3 border-t border-charcoal-700 max-w-lg mx-auto w-full">
+        <button
+          onClick={() => navigate('/board')}
+          className="btn-ghost w-full flex items-center justify-center gap-2 text-sm"
+        >
+          <ArrowLeft size={14} /> Back to Roster
         </button>
       </div>
     </div>
