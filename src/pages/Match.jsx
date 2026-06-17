@@ -251,24 +251,27 @@ export default function Match() {
         </div>
       )}
 
-      {/* Safety status strip for participants */}
-      {isParticipant && !resolved && (
-        <div className="flex gap-2 px-4 pb-2 max-w-lg mx-auto w-full">
-          {[
-            { key: 'challengerReady', label: match.participants.challengerNickname },
-            { key: 'defenderReady',   label: match.participants.defenderNickname },
-          ].map(({ key, label }) => (
-            <div
-              key={key}
-              className={`flex-1 text-center py-1.5 rounded-sm border text-xs font-sans font-bold uppercase tracking-widest ${
-                match.safety?.[key]
-                  ? 'bg-blood-900 border-blood-600 text-blood-300'
-                  : 'bg-charcoal-800 border-charcoal-500 text-dust-400'
-              }`}
-            >
-              {match.safety?.[key] ? '✓ ' : '○ '}{label}
-            </div>
-          ))}
+      {/* Safety status strip — visible to all */}
+      {!resolved && (
+        <div className="px-4 pb-2 max-w-lg mx-auto w-full">
+          <p className="section-label text-dust-700 text-center mb-1">Safety Check</p>
+          <div className="flex gap-2">
+            {[
+              { key: 'challengerReady', label: match.participants.challengerNickname },
+              { key: 'defenderReady',   label: match.participants.defenderNickname },
+            ].map(({ key, label }) => (
+              <div
+                key={key}
+                className={`flex-1 text-center py-1.5 rounded-sm border text-xs font-sans font-bold uppercase tracking-widest ${
+                  match.safety?.[key]
+                    ? 'bg-blood-900 border-blood-600 text-blood-300'
+                    : 'bg-charcoal-800 border-charcoal-500 text-dust-400'
+                }`}
+              >
+                {match.safety?.[key] ? '✓ ' : '○ '}{label}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

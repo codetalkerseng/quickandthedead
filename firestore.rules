@@ -41,9 +41,11 @@ service cloud.firestore {
     match /matches/{matchId} {
       allow read: if isSignedIn();
 
-      allow create: if isAlive() &&
+      allow create: if isAdmin() || (
+        isAlive() &&
         request.resource.data.status == 'scheduled' &&
-        request.resource.data.participants.challengerId == request.auth.uid;
+        request.resource.data.participants.challengerId == request.auth.uid
+      );
 
       // Participant can flip their own safety ready flag and nothing else
       allow update: if isSignedIn() && (
