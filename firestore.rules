@@ -26,10 +26,10 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // Profiles: owner updates their own setup fields, admins update anything
+    // Profiles: owner creates/updates their own setup fields, admins can do anything
     match /profiles/{uid} {
       allow read: if isSignedIn();
-      allow create: if ownsProfile(uid);
+      allow create: if ownsProfile(uid) || isAdmin();
       allow update: if ownsProfile(uid) &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['isAdmin', 'status', 'stats.matchesPlayed']);
