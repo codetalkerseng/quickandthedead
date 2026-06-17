@@ -7,19 +7,32 @@ const ROMAN = [
   ['VIII', 240], ['IX', 270], ['X', 300], ['XI', 330],
 ];
 
-// Convert clock-face degrees (0 = 12 o'clock, clockwise) to SVG x/y at radius r
+// Convert clock-face degrees (0 = 12 o'clock, clockwise) to SVG x/y
 function hx(deg, r) { return 100 + r * Math.cos((deg - 90) * Math.PI / 180); }
 function hy(deg, r) { return 100 + r * Math.sin((deg - 90) * Math.PI / 180); }
 
-function ClockFace({ displayMs, remaining, large }) {
-  // Second hand uses REMAINING time so it arrives exactly at 12 when DRAW! fires.
-  // At every full minute remaining the hand is at 12; it sweeps clockwise to 12 at T=0.
+function ClockFace({ remaining, serverOffset, tournamentTime, large }) {
+  // Real current time for hour + minute hands
+  const now    = Date.now() + serverOffset;
+  const d      = new Date(now);
+  const h12    = (d.getHours() % 12) + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  const minFrac = d.getMinutes() + d.getSeconds() / 60;
+  const hourAngle   = h12 * 30;    // 30° per hour
+  const minuteAngle = minFrac * 6; // 6° per minute
+
+  // Second hand: countdown-based so it strikes 12 exactly at DRAW!
   const remSec      = Math.max(0, remaining) / 1000;
   const secondAngle = remaining > 0 ? (60 - remSec % 60) * 6 : 0;
-  // Minute hand uses elapsed time — sweeps clockwise naturally.
-  const minuteAngle = ((displayMs / 60_000) % 60) * 6;
 
-  const critical = remaining < 10_000 && remaining > 0;
+  // Tournament marker angle (hour hand position of tournament start time)
+  let tMarkerAngle = null;
+  if (tournamentTime) {
+    const td  = new Date(tournamentTime.toMillis());
+    const th12 = (td.getHours() % 12) + td.getMinutes() / 60;
+    tMarkerAngle = th12 * 30;
+  }
+
+  const critical  = remaining < 10_000 && remaining > 0;
   const sizeClass = large ? 'w-[min(74vw,460px)]' : 'w-44';
 
   return (
@@ -48,24 +61,44 @@ function ClockFace({ displayMs, remaining, large }) {
         )}
       </defs>
 
-      {/* Outer drop-shadow disk */}
+      {/* Drop-shadow disk */}
       <circle cx="101" cy="103" r="95" fill="rgba(0,0,0,0.4)" />
 
       {/* Iron/bronze case */}
       <circle cx="100" cy="100" r="97" fill="url(#caseGrad)" />
-
-      {/* Outer engraved ring */}
       <circle cx="100" cy="100" r="91" fill="none" stroke="#100804" strokeWidth="2.5" />
       <circle cx="100" cy="100" r="88" fill="#b08030" />
-
-      {/* Inset shadow ring */}
       <circle cx="100" cy="100" r="86" fill="#180d04" />
 
       {/* Parchment face */}
       <circle cx="100" cy="100" r="83" fill="url(#faceGrad)" />
-
-      {/* Subtle aged ring on face */}
       <circle cx="100" cy="100" r="83" fill="none" stroke="#c9a060" strokeWidth="0.6" opacity="0.5" />
+
+      {/* ── Tournament time marker — gold arrow on the gold bezel ── */}
+      {tMarkerAngle !== null && (
+        <>
+          {/* Arrow tip pointing inward */}
+          <polygon
+            points={`
+              ${hx(tMarkerAngle, 83)},${hy(tMarkerAngle, 83)}
+              ${hx(tMarkerAngle - 3.5, 91)},${hy(tMarkerAngle - 3.5, 91)}
+              ${hx(tMarkerAngle + 3.5, 91)},${hy(tMarkerAngle + 3.5, 91)}
+            `}
+            fill="#f0c040"
+            stroke="#8b6010"
+            strokeWidth="0.6"
+          />
+          {/* Small circle dot on outer edge */}
+          <circle
+            cx={hx(tMarkerAngle, 93)}
+            cy={hy(tMarkerAngle, 93)}
+            r="2.5"
+            fill="#f0c040"
+            stroke="#8b6010"
+            strokeWidth="0.6"
+          />
+        </>
+      )}
 
       {/* Minute tick marks */}
       {Array.from({ length: 60 }, (_, i) => {
@@ -98,14 +131,21 @@ function ClockFace({ displayMs, remaining, large }) {
         </text>
       ))}
 
-      {/* Minute hand — short, thick, tapered */}
+      {/* Hour hand — short, very thick */}
       <line
-        x1={hx(minuteAngle + 180, 13)} y1={hy(minuteAngle + 180, 13)}
-        x2={hx(minuteAngle, 54)}       y2={hy(minuteAngle, 54)}
-        stroke="#2b1407" strokeWidth="5.5" strokeLinecap="round"
+        x1={hx(hourAngle + 180, 10)} y1={hy(hourAngle + 180, 10)}
+        x2={hx(hourAngle, 40)}       y2={hy(hourAngle, 40)}
+        stroke="#2b1407" strokeWidth="7" strokeLinecap="round"
       />
 
-      {/* Second hand — long blood-red sweep with counterweight tail */}
+      {/* Minute hand — medium length, medium width */}
+      <line
+        x1={hx(minuteAngle + 180, 12)} y1={hy(minuteAngle + 180, 12)}
+        x2={hx(minuteAngle, 60)}       y2={hy(minuteAngle, 60)}
+        stroke="#2b1407" strokeWidth="4.5" strokeLinecap="round"
+      />
+
+      {/* Second hand — blood red, countdown-based, long */}
       <line
         x1={hx(secondAngle + 180, 22)} y1={hy(secondAngle + 180, 22)}
         x2={hx(secondAngle, 79)}       y2={hy(secondAngle, 79)}
@@ -114,7 +154,6 @@ function ClockFace({ displayMs, remaining, large }) {
         strokeLinecap="round"
         filter={critical ? 'url(#bloodGlow)' : undefined}
       />
-      {/* Counterweight bulge on tail */}
       <circle
         cx={hx(secondAngle + 180, 16)}
         cy={hy(secondAngle + 180, 16)}
@@ -133,7 +172,14 @@ function ClockFace({ displayMs, remaining, large }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function CountdownClock({ scheduledTime, startTime, serverOffset = 0, onPhaseChange, large = false }) {
+export default function CountdownClock({
+  scheduledTime,
+  startTime,
+  tournamentTime,
+  serverOffset = 0,
+  onPhaseChange,
+  large = false,
+}) {
   const [remaining, setRemaining] = useState(null);
   const [flash, setFlash]         = useState(false);
   const rafRef     = useRef(null);
@@ -141,7 +187,6 @@ export default function CountdownClock({ scheduledTime, startTime, serverOffset 
   const firedRef   = useRef({ gong: false, w2: false, w1: false, w30: false });
 
   const scheduledMs = scheduledTime?.toMillis?.() ?? 0;
-  const startMs     = startTime?.toMillis?.() ?? null;
 
   useEffect(() => {
     firedRef.current  = { gong: false, w2: false, w1: false, w30: false };
@@ -200,7 +245,6 @@ export default function CountdownClock({ scheduledTime, startTime, serverOffset 
     );
   }
 
-  // DRAW! when remaining hits zero — second hand is exactly at 12 o'clock.
   if (remaining <= 0) {
     return (
       <div className={`text-center scanlines relative transition-colors duration-100 ${flash ? 'bg-parchment-200' : ''}`}>
@@ -214,14 +258,14 @@ export default function CountdownClock({ scheduledTime, startTime, serverOffset 
     );
   }
 
-  // Elapsed since match was called (clockwise sweep); falls back to remaining if no startTime
-  const displayMs = startMs !== null
-    ? Math.max(0, scheduledMs - startMs - Math.max(0, remaining))
-    : Math.max(0, remaining);
-
   return (
     <div className={`flex flex-col items-center gap-4 ${flash ? 'invert' : ''} transition-all duration-100`}>
-      <ClockFace displayMs={displayMs} remaining={remaining} large={large} />
+      <ClockFace
+        remaining={remaining}
+        serverOffset={serverOffset}
+        tournamentTime={tournamentTime}
+        large={large}
+      />
 
       {remaining <= 30_000 && remaining >= 1_000 && (
         <p className={`font-sans text-blood-400 uppercase tracking-[0.4em] animate-pulse ${large ? 'text-lg' : 'text-xs'}`}>

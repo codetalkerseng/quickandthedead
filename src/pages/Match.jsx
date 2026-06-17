@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useServerTimeOffset } from '../hooks/useServerTimeOffset';
@@ -136,10 +136,18 @@ export default function Match() {
   const navigate = useNavigate();
   const serverOffset = useServerTimeOffset();
 
-  const [match, setMatch]                   = useState(null);
+  const [match, setMatch]                         = useState(null);
   const [challengerProfile, setChallengerProfile] = useState(null);
   const [defenderProfile,   setDefenderProfile]   = useState(null);
-  const [phase, setPhase]                   = useState('announced');
+  const [phase, setPhase]                         = useState('announced');
+  const [tournament, setTournament]               = useState(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'tournaments'), where('details.status', '==', 'active'));
+    return onSnapshot(q, (snap) => {
+      setTournament(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+    });
+  }, []);
 
   useEffect(() => {
     return onSnapshot(doc(db, 'matches', matchId), (snap) => {
@@ -222,6 +230,7 @@ export default function Match() {
           <CountdownClock
             scheduledTime={match.timing.scheduledTime}
             startTime={match.timing.createdAt}
+            tournamentTime={tournament?.details?.startTime ?? null}
             serverOffset={serverOffset}
             onPhaseChange={setPhase}
             large
