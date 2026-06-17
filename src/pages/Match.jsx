@@ -195,7 +195,7 @@ export default function Match() {
     <div className={`min-h-screen ${bgClass} transition-colors duration-500 flex flex-col`}>
       {needsSafety && (
         <SafetyGate
-          matchId={matchId}
+          matchId={match.id}
           participantKey={participantKey}
           onReady={() => {}}
         />
