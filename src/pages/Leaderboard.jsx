@@ -75,9 +75,12 @@ function PlayerRow({ rank, profile, showStatus = false }) {
         </p>
       </div>
 
-      <div className="text-right flex-shrink-0">
-        <p className="font-sans font-bold text-gold-400 text-lg leading-none">{wins}</p>
-        <p className="font-body text-dust-600 text-[10px] mt-0.5">{duels} duel{duels !== 1 ? 's' : ''}</p>
+      <div className="text-right flex-shrink-0 min-w-[48px]">
+        <p className="font-display text-gold-400 text-2xl leading-none">{wins}</p>
+        <p className="font-sans text-dust-500 text-[10px] uppercase tracking-wide mt-0.5">
+          {wins === 1 ? 'win' : 'wins'}
+        </p>
+        <p className="font-body text-dust-700 text-[9px] mt-0.5">{duels} duels</p>
       </div>
     </div>
   );

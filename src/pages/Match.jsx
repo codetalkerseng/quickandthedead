@@ -37,7 +37,7 @@ function ParticipantCard({ profile, label, isWinner, large }) {
     <div className={`flex flex-col items-center gap-1 flex-1 p-2 rounded-sm transition-all ${
       isWinner ? 'bg-gold-600/20 border border-gold-500' : ''
     }`}>
-      <p className="section-label text-dust-600 text-[9px]">{label}</p>
+      <p className="font-sans font-bold text-dust-400 text-xs uppercase tracking-widest">{label}</p>
       <PlayerAvatar profile={profile} size={large ? 'lg' : 'md'} />
       <p className={`font-sans font-bold text-parchment-100 uppercase tracking-wide text-center truncate w-full ${large ? 'text-base' : 'text-sm'}`}>
         {profile?.personal?.nickname ?? '…'}
@@ -263,7 +263,7 @@ export default function Match() {
               className={`flex-1 text-center py-1.5 rounded-sm border text-xs font-sans font-bold uppercase tracking-widest ${
                 match.safety?.[key]
                   ? 'bg-blood-900 border-blood-600 text-blood-300'
-                  : 'bg-charcoal-800 border-charcoal-600 text-dust-600'
+                  : 'bg-charcoal-800 border-charcoal-500 text-dust-400'
               }`}
             >
               {match.safety?.[key] ? '✓ ' : '○ '}{label}

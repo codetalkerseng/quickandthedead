@@ -40,10 +40,11 @@ function AdminTab({ label, icon: Icon, active, onClick }) {
 // ─── Resolve Match Panel ──────────────────────────────────────────────────────
 
 function MatchesPanel() {
+  const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [profiles, setProfiles] = useState({});
   const [busy, setBusy] = useState(null);
-  const [adjusting, setAdjusting] = useState(null); // matchId being time-adjusted
+  const [adjusting, setAdjusting] = useState(null);
   const [deltaMin, setDeltaMin] = useState(0);
 
   useEffect(() => {
@@ -96,9 +97,10 @@ function MatchesPanel() {
   async function fireNow(match) {
     await writeBatch(db)
       .update(doc(db, 'matches', match.id), {
-        'timing.scheduledTime': Timestamp.fromMillis(Date.now() + 3000),
+        'timing.scheduledTime': Timestamp.fromMillis(Date.now() + 60_000),
       })
       .commit();
+    navigate(`/match/${match.id}`);
   }
 
   if (matches.length === 0) {
