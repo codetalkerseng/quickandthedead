@@ -23,31 +23,23 @@ export default function CountdownClock({ scheduledTime, serverOffset = 0, onPhas
       const ms  = scheduledMs - now;
       setRemaining(ms);
 
-      const sec = Math.ceil(ms / 1000);
+      // Use the same floor the display uses so chimes fire exactly when the digit changes.
+      const displaySec = Math.max(0, Math.floor(ms / 1000));
       const fired = firedRef.current;
 
-      // ── Warning chimes ──────────────────────────────────────────────────
-      if (ms <= 120_000 && ms > 119_500 && !fired.w2) {
-        fired.w2 = true;
-        playWarning(1); // single bell at 2 min
-      }
-      if (ms <= 60_000 && ms > 59_500 && !fired.w1) {
-        fired.w1 = true;
-        playWarning(2); // double bell at 1 min
-      }
-      if (ms <= 30_000 && ms > 29_500 && !fired.w30) {
-        fired.w30 = true;
-        playWarning(3); // triple bell at 30 sec
-      }
+      // ── Warning chimes — fire as display first shows the threshold second ─
+      if (ms < 121_000 && ms > 120_000 && !fired.w2)  { fired.w2  = true; playWarning(1); }
+      if (ms < 61_000  && ms > 60_000  && !fired.w1)  { fired.w1  = true; playWarning(2); }
+      if (ms < 31_000  && ms > 30_000  && !fired.w30) { fired.w30 = true; playWarning(3); }
 
       // ── Heartbeat / tick during final countdown ─────────────────────────
-      if (ms > 0 && ms <= 60_000 && prevSecRef.current !== sec) {
+      if (ms < 61_000 && ms >= 1_000 && prevSecRef.current !== displaySec) {
         if (ms > 10_000) playHeartbeat();
         else             playTick();
       }
 
-      // ── Gong at T=0 ────────────────────────────────────────────────────
-      if (ms <= 0 && ms > -500 && !fired.gong) {
+      // ── Gong fires the moment display would first show 00:00 ───────────
+      if (ms < 1_000 && ms >= 0 && !fired.gong) {
         fired.gong = true;
         playGong();
         setFlash(true);
@@ -55,15 +47,15 @@ export default function CountdownClock({ scheduledTime, serverOffset = 0, onPhas
       }
 
       // ── Phase reporting ─────────────────────────────────────────────────
-      if (onPhaseChange && prevSecRef.current !== sec) {
+      if (onPhaseChange && prevSecRef.current !== displaySec) {
         if      (ms > 5 * 60_000)  onPhaseChange('announced');
         else if (ms > 60_000)      onPhaseChange('warning');
-        else if (ms > 0)           onPhaseChange('countdown');
+        else if (ms >= 1_000)      onPhaseChange('countdown');
         else if (ms > -30_000)     onPhaseChange('fire');
         else                       onPhaseChange('afterfire');
       }
 
-      prevSecRef.current = sec;
+      prevSecRef.current = displaySec;
       rafRef.current = requestAnimationFrame(tick);
     }
 
@@ -103,7 +95,8 @@ export default function CountdownClock({ scheduledTime, serverOffset = 0, onPhas
     );
   }
 
-  if (remaining <= 0) {
+  // Show DRAW! as soon as display would read 00:00 (remaining < 1 second)
+  if (remaining < 1_000) {
     return (
       <div className={`text-center scanlines relative transition-colors duration-100 ${flash ? 'bg-parchment-200' : ''}`}>
         <p className={`font-display text-blood-400 animate-pulse-red drop-shadow-[0_0_32px_rgba(197,48,48,1)] ${large ? 'text-[22vw] leading-none' : 'text-5xl'}`}>
