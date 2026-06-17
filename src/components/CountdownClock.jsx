@@ -12,12 +12,14 @@ function hx(deg, r) { return 100 + r * Math.cos((deg - 90) * Math.PI / 180); }
 function hy(deg, r) { return 100 + r * Math.sin((deg - 90) * Math.PI / 180); }
 
 function ClockFace({ displayMs, remaining, large }) {
-  const secFrac     = (displayMs / 1000) % 60;
-  const minFrac     = (displayMs / 60_000) % 60;
-  const secondAngle = secFrac * 6;    // 0–360 deg
-  const minuteAngle = minFrac * 6;
+  // Second hand uses REMAINING time so it arrives exactly at 12 when DRAW! fires.
+  // At every full minute remaining the hand is at 12; it sweeps clockwise to 12 at T=0.
+  const remSec      = Math.max(0, remaining) / 1000;
+  const secondAngle = remaining > 0 ? (60 - remSec % 60) * 6 : 0;
+  // Minute hand uses elapsed time — sweeps clockwise naturally.
+  const minuteAngle = ((displayMs / 60_000) % 60) * 6;
 
-  const critical = remaining < 10_000 && remaining >= 1_000;
+  const critical = remaining < 10_000 && remaining > 0;
   const sizeClass = large ? 'w-[min(74vw,460px)]' : 'w-44';
 
   return (
@@ -198,7 +200,8 @@ export default function CountdownClock({ scheduledTime, startTime, serverOffset 
     );
   }
 
-  if (remaining < 1_000) {
+  // DRAW! when remaining hits zero — second hand is exactly at 12 o'clock.
+  if (remaining <= 0) {
     return (
       <div className={`text-center scanlines relative transition-colors duration-100 ${flash ? 'bg-parchment-200' : ''}`}>
         <p className={`font-display text-blood-400 animate-pulse-red drop-shadow-[0_0_32px_rgba(197,48,48,1)] ${large ? 'text-[22vw] leading-none' : 'text-5xl'}`}>
