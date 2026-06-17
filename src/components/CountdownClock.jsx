@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { playGong, playHeartbeat, playWarning, playTick } from '../lib/audio';
 
 // scheduledTime  — Firebase Timestamp for T=0
+// startTime      — Firebase Timestamp for T=start (createdAt); enables stopwatch mode
 // serverOffset   — ms drift from useServerTimeOffset
 // onPhaseChange  — callback(phase string)
 // large          — tablet/display mode: fills most of the screen width
-export default function CountdownClock({ scheduledTime, serverOffset = 0, onPhaseChange, large = false }) {
+export default function CountdownClock({ scheduledTime, startTime, serverOffset = 0, onPhaseChange, large = false }) {
   const [remaining, setRemaining] = useState(null);
   const [flash, setFlash]         = useState(false);
   const rafRef      = useRef(null);
@@ -13,6 +14,7 @@ export default function CountdownClock({ scheduledTime, serverOffset = 0, onPhas
   const firedRef    = useRef({ gong: false, w2: false, w1: false, w30: false });
 
   const scheduledMs = scheduledTime?.toMillis?.() ?? 0;
+  const startMs     = startTime?.toMillis?.() ?? null;
 
   useEffect(() => {
     firedRef.current = { gong: false, w2: false, w1: false, w30: false };
@@ -65,10 +67,14 @@ export default function CountdownClock({ scheduledTime, serverOffset = 0, onPhas
 
   if (remaining === null) return null;
 
-  const totalSec = Math.max(0, Math.floor(remaining / 1000));
-  const mins = Math.floor(totalSec / 60);
-  const secs = totalSec % 60;
-  const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  // Stopwatch: count up from startMs; fallback to countdown if no startTime given.
+  const displayMs  = startMs !== null
+    ? Math.max(0, scheduledMs - startMs - Math.max(0, remaining))
+    : Math.max(0, remaining);
+  const totalSec   = Math.floor(displayMs / 1000);
+  const mins       = Math.floor(totalSec / 60);
+  const secs       = totalSec % 60;
+  const display    = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
   const colorClass =
     remaining > 5 * 60_000 ? 'text-parchment-200' :

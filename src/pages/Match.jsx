@@ -221,6 +221,7 @@ export default function Match() {
         <div className="flex-1 flex items-center justify-center px-4 py-6">
           <CountdownClock
             scheduledTime={match.timing.scheduledTime}
+            startTime={match.timing.createdAt}
             serverOffset={serverOffset}
             onPhaseChange={setPhase}
             large
