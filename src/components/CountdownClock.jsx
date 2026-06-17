@@ -245,27 +245,34 @@ export default function CountdownClock({
     );
   }
 
-  if (remaining <= 0) {
-    return (
-      <div className={`text-center scanlines relative transition-colors duration-100 ${flash ? 'bg-parchment-200' : ''}`}>
-        <p className={`font-display text-blood-400 animate-pulse-red drop-shadow-[0_0_32px_rgba(197,48,48,1)] ${large ? 'text-[22vw] leading-none' : 'text-5xl'}`}>
-          DRAW!
-        </p>
-        <p className={`font-sans text-blood-500 uppercase tracking-[0.4em] mt-2 ${large ? 'text-xl' : 'text-xs'}`}>
-          Active Fire
-        </p>
-      </div>
-    );
-  }
+  // Always render the clock face. Overlay DRAW! on top with hand frozen at 12,
+  // so the user sees the hand strike 12 at the exact moment the text appears.
+  const drawing = remaining <= 0;
 
   return (
     <div className={`flex flex-col items-center gap-4 ${flash ? 'invert' : ''} transition-all duration-100`}>
-      <ClockFace
-        remaining={remaining}
-        serverOffset={serverOffset}
-        tournamentTime={tournamentTime}
-        large={large}
-      />
+      <div className="relative">
+        <ClockFace
+          remaining={drawing ? 0 : remaining}
+          serverOffset={serverOffset}
+          tournamentTime={tournamentTime}
+          large={large}
+        />
+        {drawing && (
+          <div className={`absolute inset-0 flex flex-col items-center justify-center scanlines
+                           rounded-full ${flash ? 'bg-parchment-200/70' : 'bg-charcoal-900/50'}`}>
+            <p className={`font-display text-blood-400 animate-pulse-red
+                           drop-shadow-[0_0_32px_rgba(197,48,48,1)]
+                           ${large ? 'text-[18vw] leading-none' : 'text-4xl'}`}>
+              DRAW!
+            </p>
+            <p className={`font-sans text-blood-300 uppercase tracking-[0.4em] mt-1
+                           ${large ? 'text-lg' : 'text-[10px]'}`}>
+              Active Fire
+            </p>
+          </div>
+        )}
+      </div>
 
       {remaining <= 30_000 && remaining >= 1_000 && (
         <p className={`font-sans text-blood-400 uppercase tracking-[0.4em] animate-pulse ${large ? 'text-lg' : 'text-xs'}`}>
