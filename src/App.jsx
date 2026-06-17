@@ -6,6 +6,7 @@ import Onboarding from './pages/Onboarding';
 import Board from './pages/Board';
 import BootHill from './pages/BootHill';
 import Match from './pages/Match';
+import Admin from './pages/Admin';
 import SheriffStar from './components/ui/SheriffStar';
 
 function ComingSoon({ name }) {
@@ -107,7 +108,7 @@ function AppShell() {
           path="/admin"
           element={
             <ProtectedRoute adminOnly>
-              <ComingSoon name="Sheriff's Office" />
+              <Admin />
             </ProtectedRoute>
           }
         />
