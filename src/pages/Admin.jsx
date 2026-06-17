@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   collection, query, where, onSnapshot, doc,
   writeBatch, serverTimestamp, increment, Timestamp,
-  addDoc, setDoc, getDoc, orderBy,
+  addDoc, setDoc, getDoc, orderBy, deleteDoc,
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../lib/firebase';
@@ -542,6 +542,55 @@ function TournamentPanel() {
   );
 }
 
+// ─── Seed data ────────────────────────────────────────────────────────────────
+
+const SEED_PLAYERS = [
+  { uid: 'test_ellen',    name: 'Sharon Stone',    nickname: 'The Lady',      align: 'ellen',    hand: 'right', status: 'alive',        duels: 2, lastMatchMinsAgo: 20 },
+  { uid: 'test_herod',    name: 'Gene Hackman',    nickname: 'Herod',         align: 'herod',    hand: 'right', status: 'alive',        duels: 5, lastMatchMinsAgo: 12 },
+  { uid: 'test_cort',     name: 'Russell Crowe',   nickname: 'Cort',          align: 'cort',     hand: 'left',  status: 'alive',        duels: 3, lastMatchMinsAgo: 52 },
+  { uid: 'test_kid',      name: 'Leonardo DiCaprio', nickname: 'The Kid',     align: 'kid',      hand: 'right', status: 'alive',        duels: 1, lastMatchMinsAgo: 48 },
+  { uid: 'test_hanlon',   name: 'Lance Henriksen', nickname: 'Ace Hanlon',    align: 'hanlon',   hand: 'right', status: 'alive',        duels: 0, lastMatchMinsAgo: null },
+  { uid: 'test_cantrell', name: 'Keith David',     nickname: 'Cantrell',      align: 'cantrell', hand: 'right', status: 'alive',        duels: 4, lastMatchMinsAgo: 30 },
+  { uid: 'test_spotted',  name: 'Jonothon Gill',   nickname: 'Spotted Horse', align: 'spotted',  hand: 'left',  status: 'alive',        duels: 1, lastMatchMinsAgo: 61 },
+  { uid: 'test_scars',    name: 'Mark Boone Jr.',  nickname: 'Scars',         align: 'scars',    hand: 'right', status: 'alive',        duels: 2, lastMatchMinsAgo: 38 },
+  { uid: 'test_kelly',    name: 'Tobin Bell',      nickname: 'Kelly',         align: 'kelly',    hand: 'right', status: 'eliminated',   duels: 2, lastMatchMinsAgo: 90, lastOpp: 'Herod' },
+  { uid: 'test_gutzon',   name: 'Sven-Ole Thorsen', nickname: 'Gutzon',       align: 'gutzon',   hand: 'right', status: 'disqualified', duels: 1, lastMatchMinsAgo: 70, lastOpp: 'The Lady' },
+];
+
+async function seedTestPlayers() {
+  const now = Date.now();
+  const batch = writeBatch(db);
+  SEED_PLAYERS.forEach((p) => {
+    const lastMatchTime = p.lastMatchMinsAgo != null
+      ? Timestamp.fromMillis(now - p.lastMatchMinsAgo * 60_000)
+      : null;
+    batch.set(doc(db, 'profiles', p.uid), {
+      personal: {
+        name: p.name,
+        nickname: p.nickname,
+        photoURL: null,
+        handPreference: p.hand,
+        characterAlign: p.align,
+      },
+      status: p.status,
+      isAdmin: false,
+      stats: {
+        joinedAt: Timestamp.fromMillis(now - 120 * 60_000), // joined 2 hrs ago
+        lastMatchTime,
+        matchesPlayed: p.duels,
+        ...(p.lastOpp ? { lastOpponentNickname: p.lastOpp } : {}),
+      },
+    });
+  });
+  await batch.commit();
+}
+
+async function clearTestPlayers() {
+  const batch = writeBatch(db);
+  SEED_PLAYERS.forEach((p) => batch.delete(doc(db, 'profiles', p.uid)));
+  await batch.commit();
+}
+
 // ─── Players Panel ────────────────────────────────────────────────────────────
 
 function PlayersPanel() {
@@ -551,6 +600,7 @@ function PlayersPanel() {
   const [forceMin, setForceMin] = useState(10);
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
     return onSnapshot(
@@ -608,8 +658,49 @@ function PlayersPanel() {
     setForceA(p); setForceB(null);
   }
 
+  async function handleSeed() {
+    setSeeding(true);
+    await seedTestPlayers();
+    setSeeding(false);
+  }
+
+  async function handleClear() {
+    if (!window.confirm('Remove all test players?')) return;
+    setSeeding(true);
+    await clearTestPlayers();
+    setForceA(null);
+    setForceB(null);
+    setSeeding(false);
+  }
+
+  const hasTestPlayers = players.some((p) => p.uid.startsWith('test_'));
+
   return (
     <div className="space-y-4">
+      {/* Test player controls */}
+      <div className="flex gap-2">
+        <button
+          onClick={handleSeed}
+          disabled={seeding}
+          className="flex-1 py-2 text-xs font-sans font-bold uppercase tracking-widest rounded-sm
+                     border border-dust-600 text-dust-400 hover:border-gold-500 hover:text-gold-400
+                     transition-colors disabled:opacity-40"
+        >
+          {seeding ? 'Working…' : '⚡ Seed Test Players'}
+        </button>
+        {hasTestPlayers && (
+          <button
+            onClick={handleClear}
+            disabled={seeding}
+            className="py-2 px-3 text-xs font-sans font-bold uppercase tracking-widest rounded-sm
+                       border border-charcoal-600 text-dust-700 hover:border-blood-700 hover:text-blood-500
+                       transition-colors disabled:opacity-40"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* Force match builder */}
       {(forceA || forceB) && (
         <div className="bg-charcoal-800 border-2 border-gold-600 rounded-sm p-3">
