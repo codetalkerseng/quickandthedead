@@ -11,28 +11,33 @@ const ROMAN = [
 function hx(deg, r) { return 100 + r * Math.cos((deg - 90) * Math.PI / 180); }
 function hy(deg, r) { return 100 + r * Math.sin((deg - 90) * Math.PI / 180); }
 
-function ClockFace({ remaining, serverOffset, tournamentTime, large }) {
-  // Real current time for hour + minute hands
-  const now    = Date.now() + serverOffset;
-  const d      = new Date(now);
-  const h12    = (d.getHours() % 12) + d.getMinutes() / 60 + d.getSeconds() / 3600;
-  const minFrac = d.getMinutes() + d.getSeconds() / 60;
-  const hourAngle   = h12 * 30;    // 30° per hour
-  const minuteAngle = minFrac * 6; // 6° per minute
+// scheduledMs passed as a plain number so ClockFace can compute remaining
+// fresh from Date.now() on every render, bypassing React state batching.
+function ClockFace({ scheduledMs, serverOffset, tournamentTime, large }) {
+  // Fresh ms — always current, never stale from batched state
+  const now  = Date.now() + serverOffset;
+  const ms   = scheduledMs - now;
 
-  // Second hand: countdown-based so it strikes 12 exactly at DRAW!
-  const remSec      = Math.max(0, remaining) / 1000;
-  const secondAngle = remaining > 0 ? (60 - remSec % 60) * 6 : 0;
+  // Hour + minute hands from real current time
+  const d       = new Date(now);
+  const h12     = (d.getHours() % 12) + d.getMinutes() / 60 + d.getSeconds() / 3600;
+  const minFrac = d.getMinutes() + d.getSeconds() / 60;
+  const hourAngle   = h12 * 30;
+  const minuteAngle = minFrac * 6;
+
+  // Second hand sweeps clockwise toward 12 at T=0, then stays at 12
+  const remSec      = Math.max(0, ms) / 1000;
+  const secondAngle = ms > 0 ? (60 - remSec % 60) * 6 : 0;
 
   // Marker at the minute-hand position of the next match time
   let tMarkerAngle = null;
   if (tournamentTime) {
-    const td     = new Date(tournamentTime.toMillis());
-    const minFrac = td.getMinutes() + td.getSeconds() / 60;
-    tMarkerAngle  = minFrac * 6; // same scale as minute hand (6° per minute)
+    const td      = new Date(tournamentTime.toMillis());
+    const mFrac   = td.getMinutes() + td.getSeconds() / 60;
+    tMarkerAngle  = mFrac * 6;
   }
 
-  const critical  = remaining < 10_000 && remaining > 0;
+  const critical  = ms < 10_000 && ms > 0;
   const sizeClass = large ? 'w-[min(74vw,460px)]' : 'w-44';
 
   return (
@@ -245,34 +250,22 @@ export default function CountdownClock({
     );
   }
 
-  // Always render the clock face. Overlay DRAW! on top with hand frozen at 12,
-  // so the user sees the hand strike 12 at the exact moment the text appears.
-  const drawing = remaining <= 0;
-
   return (
     <div className={`flex flex-col items-center gap-4 ${flash ? 'invert' : ''} transition-all duration-100`}>
-      <div className="relative">
-        <ClockFace
-          remaining={drawing ? 0 : remaining}
-          serverOffset={serverOffset}
-          tournamentTime={tournamentTime}
-          large={large}
-        />
-        {drawing && (
-          <div className={`absolute inset-0 flex flex-col items-center justify-center scanlines
-                           rounded-full ${flash ? 'bg-parchment-200/70' : 'bg-charcoal-900/50'}`}>
-            <p className={`font-display text-blood-400 animate-pulse-red
-                           drop-shadow-[0_0_32px_rgba(197,48,48,1)]
-                           ${large ? 'text-[18vw] leading-none' : 'text-4xl'}`}>
-              DRAW!
-            </p>
-            <p className={`font-sans text-blood-300 uppercase tracking-[0.4em] mt-1
-                           ${large ? 'text-lg' : 'text-[10px]'}`}>
-              Active Fire
-            </p>
-          </div>
-        )}
-      </div>
+      <ClockFace
+        scheduledMs={scheduledMs}
+        serverOffset={serverOffset}
+        tournamentTime={tournamentTime}
+        large={large}
+      />
+
+      {remaining <= 0 && (
+        <p className={`font-display text-blood-400 animate-pulse-red
+                       drop-shadow-[0_0_32px_rgba(197,48,48,1)]
+                       ${large ? 'text-[10vw]' : 'text-3xl'}`}>
+          DRAW!
+        </p>
+      )}
 
       {remaining <= 30_000 && remaining >= 1_000 && (
         <p className={`font-sans text-blood-400 uppercase tracking-[0.4em] animate-pulse ${large ? 'text-lg' : 'text-xs'}`}>
