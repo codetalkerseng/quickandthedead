@@ -210,7 +210,7 @@ export default function CountdownClock({
         else             playTick();
       }
 
-      if (ms < 1_000 && ms >= 0 && !fired.gong) {
+      if (ms <= 0 && ms > -500 && !fired.gong) {
         fired.gong = true;
         playGong();
         setFlash(true);
