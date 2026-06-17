@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { doc, onSnapshot, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useServerTimeOffset } from '../hooks/useServerTimeOffset';
@@ -131,7 +131,6 @@ function AdminResolveControls({ match, onResolved }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Match() {
-  const { matchId } = useParams();
   const { userProfile } = useAuth();
   const navigate = useNavigate();
   const serverOffset = useServerTimeOffset();
@@ -140,20 +139,19 @@ export default function Match() {
   const [challengerProfile, setChallengerProfile] = useState(null);
   const [defenderProfile,   setDefenderProfile]   = useState(null);
   const [phase, setPhase]                         = useState('announced');
-  const [tournament, setTournament]               = useState(null);
 
+  // Always track the soonest upcoming match
   useEffect(() => {
-    const q = query(collection(db, 'tournaments'), where('details.status', '==', 'active'));
+    const q = query(
+      collection(db, 'matches'),
+      where('status', '==', 'scheduled'),
+      orderBy('timing.scheduledTime', 'asc'),
+      limit(1)
+    );
     return onSnapshot(q, (snap) => {
-      setTournament(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+      setMatch(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
     });
   }, []);
-
-  useEffect(() => {
-    return onSnapshot(doc(db, 'matches', matchId), (snap) => {
-      if (snap.exists()) setMatch({ id: snap.id, ...snap.data() });
-    });
-  }, [matchId]);
 
   useEffect(() => {
     if (!match) return;
@@ -166,8 +164,9 @@ export default function Match() {
 
   if (!match) {
     return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center">
-        <SheriffStar size={40} className="animate-pulse" />
+      <div className="min-h-screen bg-charcoal-900 flex flex-col items-center justify-center gap-4">
+        <SheriffStar size={40} className="text-dust-700" />
+        <p className="font-body text-dust-600 uppercase tracking-widest text-sm">No match scheduled</p>
       </div>
     );
   }

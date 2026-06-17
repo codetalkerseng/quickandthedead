@@ -103,7 +103,7 @@ export default function Board() {
         result: null,
       });
       setSelected(null);
-      navigate(`/match/${ref.id}`);
+      navigate('/match');
     } catch (err) {
       console.error(err);
       setCalling(false);
@@ -131,7 +131,7 @@ export default function Board() {
       {/* My active match banner */}
       {myMatch && (
         <button
-          onClick={() => navigate(`/match/${myMatch.id}`)}
+          onClick={() => navigate('/match')}
           className="w-full bg-blood-800 border-b border-blood-600 px-4 py-2 text-center"
         >
           <p className="font-sans font-bold uppercase tracking-widest text-blood-200 text-xs animate-pulse">
@@ -288,7 +288,7 @@ export default function Board() {
                 .map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => navigate(`/match/${m.id}`)}
+                    onClick={() => navigate('/match')}
                     className="w-full panel flex items-center gap-3 p-3 border border-charcoal-600
                                hover:border-dust-400 text-left transition-colors"
                   >

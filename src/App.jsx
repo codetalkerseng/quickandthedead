@@ -75,7 +75,7 @@ function AppShell() {
         <Route path="/boot-hill"  element={<ProtectedRoute><BootHill /></ProtectedRoute>} />
         <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/leaderboard"    element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-        <Route path="/match/:matchId" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+        <Route path="/match"          element={<ProtectedRoute><Match /></ProtectedRoute>} />
         <Route path="/admin"      element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
 
         <Route path="/" element={<Navigate to="/board" replace />} />

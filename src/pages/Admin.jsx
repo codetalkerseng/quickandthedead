@@ -100,7 +100,7 @@ function MatchesPanel() {
         'timing.scheduledTime': Timestamp.fromMillis(Date.now() + 60_000),
       })
       .commit();
-    navigate(`/match/${match.id}`);
+    navigate('/match');
   }
 
   if (matches.length === 0) {
