@@ -3,34 +3,24 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
+import Profile from './pages/Profile';
 import Board from './pages/Board';
 import BootHill from './pages/BootHill';
 import Match from './pages/Match';
 import Admin from './pages/Admin';
 import SheriffStar from './components/ui/SheriffStar';
 
-function ComingSoon({ name }) {
-  return (
-    <div className="min-h-screen bg-charcoal-900 flex items-center justify-center">
-      <div className="text-center">
-        <SheriffStar size={48} className="mx-auto mb-4" />
-        <h1 className="font-display text-gold-400 text-3xl">{name}</h1>
-        <p className="font-body text-dust-600 text-sm uppercase tracking-widest mt-2">
-          Coming soon, stranger
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function NavBar() {
   const { currentUser, userProfile } = useAuth();
   const location = useLocation();
-  if (!currentUser || !userProfile) return null;
+
+  const hidden = ['/login', '/onboarding'];
+  if (!currentUser || !userProfile || hidden.includes(location.pathname)) return null;
 
   const links = [
-    { to: '/board', label: 'Roster' },
+    { to: '/board',     label: 'Roster' },
     { to: '/boot-hill', label: 'Boot Hill' },
+    { to: '/profile',   label: 'Profile' },
     ...(userProfile.isAdmin ? [{ to: '/admin', label: "Sheriff's" }] : []),
   ];
 
@@ -77,41 +67,15 @@ function AppShell() {
       )}
 
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login"      element={<Login />} />
         <Route path="/onboarding" element={<Onboarding />} />
 
-        <Route
-          path="/board"
-          element={
-            <ProtectedRoute>
-              <Board />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/boot-hill"
-          element={
-            <ProtectedRoute>
-              <BootHill />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/match/:matchId"
-          element={
-            <ProtectedRoute>
-              <Match />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute adminOnly>
-              <Admin />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/board"      element={<ProtectedRoute><Board /></ProtectedRoute>} />
+        <Route path="/boot-hill"  element={<ProtectedRoute><BootHill /></ProtectedRoute>} />
+        <Route path="/profile"    element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/match/:matchId" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+        <Route path="/admin"      element={<ProtectedRoute adminOnly><Admin /></ProtectedRoute>} />
+
         <Route path="/" element={<Navigate to="/board" replace />} />
         <Route path="*" element={<Navigate to="/board" replace />} />
       </Routes>

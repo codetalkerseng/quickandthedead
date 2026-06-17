@@ -11,7 +11,7 @@ import PlayerAvatar from '../components/ui/PlayerAvatar';
 import SheriffStar from '../components/ui/SheriffStar';
 import RopeDivider from '../components/ui/RopeDivider';
 import CrossedPistols from '../components/ui/CrossedPistols';
-import { Shield, Clock, Users, Trophy, Trash2, Swords, Plus, Minus, AlertTriangle } from 'lucide-react';
+import { Shield, Clock, Users, Trophy, Trash2, Swords, Plus, Minus, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
 
@@ -284,41 +284,45 @@ function MatchesPanel() {
 
 // ─── Tournament Panel ─────────────────────────────────────────────────────────
 
-const EMPTY_TOURNAMENT = {
+const EMPTY_FORM = {
   name: 'Redemption Quick-Draw Tournament',
-  date: '',
-  time: '',
-  location: '',
-  status: 'upcoming',
-  rules: '',
+  date: '', time: '', location: '', status: 'upcoming', rules: '',
 };
+const EMPTY_PRIZES = [{ title: '1st Place', description: '' }];
 
-function TournamentPanel() {
-  const [form, setForm] = useState(EMPTY_TOURNAMENT);
-  const [prizes, setPrizes] = useState([{ title: '1st Place', description: '' }]);
-  const [tournamentId, setTournamentId] = useState(null);
+// Shared input classes — NO w-full so they don't fight flex-1 in prize rows
+const inputBase = `bg-charcoal-900 border border-charcoal-600 text-parchment-100
+                   font-body px-3 py-2 rounded-sm focus:outline-none focus:border-gold-500
+                   placeholder-dust-700`;
+const inputFull = `w-full ${inputBase}`;
+
+function statusBadge(status) {
+  if (status === 'active') return 'bg-blood-900 text-blood-300 border-blood-700';
+  if (status === 'ended')  return 'bg-charcoal-700 text-dust-600 border-charcoal-600';
+  return 'bg-charcoal-800 text-dust-400 border-charcoal-600';
+}
+
+function TournamentEdit({ tournamentId, initialData, onBack }) {
+  const isNew = !tournamentId;
+  const [form, setForm] = useState(
+    initialData
+      ? {
+          name: initialData.details?.name ?? EMPTY_FORM.name,
+          date: initialData.details?.date ?? '',
+          time: initialData.details?.time ?? '',
+          location: initialData.details?.location ?? '',
+          status: initialData.details?.status ?? 'upcoming',
+          rules: initialData.details?.rules ?? '',
+        }
+      : { ...EMPTY_FORM }
+  );
+  const [prizes, setPrizes] = useState(
+    initialData?.prizes?.map((p) => ({ title: p.title ?? '', description: p.description ?? '' }))
+    ?? [...EMPTY_PRIZES]
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    const q = query(collection(db, 'tournaments'), orderBy('details.date', 'desc'));
-    return onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        const data = d.data();
-        setTournamentId(d.id);
-        setForm({
-          name: data.details?.name ?? EMPTY_TOURNAMENT.name,
-          date: data.details?.date ?? '',
-          time: data.details?.time ?? '',
-          location: data.details?.location ?? '',
-          status: data.details?.status ?? 'upcoming',
-          rules: data.details?.rules ?? '',
-        });
-        setPrizes(data.prizes ?? [{ title: '1st Place', description: '' }]);
-      }
-    });
-  }, []);
+  const [deleting, setDeleting] = useState(false);
 
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
   function setPrize(i, k, v) {
@@ -329,6 +333,8 @@ function TournamentPanel() {
 
   async function save() {
     setSaving(true);
+    const wasAlreadyActive = initialData?.details?.status === 'active';
+    const goingActive = form.status === 'active' && !wasAlreadyActive;
     const data = {
       details: {
         name: form.name,
@@ -337,60 +343,65 @@ function TournamentPanel() {
         location: form.location,
         status: form.status,
         rules: form.rules,
-        ...(form.status === 'active' ? { startTime: serverTimestamp() } : {}),
+        ...(goingActive ? { startTime: serverTimestamp() } : {}),
       },
       prizes,
     };
-    if (tournamentId) {
-      await writeBatch(db).update(doc(db, 'tournaments', tournamentId), data).commit();
-    } else {
+    if (isNew) {
       await addDoc(collection(db, 'tournaments'), data);
+    } else {
+      await writeBatch(db).update(doc(db, 'tournaments', tournamentId), data).commit();
     }
     setSaving(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => { setSaved(false); onBack(); }, 1200);
   }
 
-  const inputCls = `w-full bg-charcoal-900 border border-charcoal-600 text-parchment-100
-                    font-body px-3 py-2 rounded-sm focus:outline-none focus:border-gold-500
-                    placeholder-dust-700`;
+  async function deleteTournament() {
+    if (!window.confirm('Delete this tournament? This cannot be undone.')) return;
+    setDeleting(true);
+    await writeBatch(db).delete(doc(db, 'tournaments', tournamentId)).commit();
+    onBack();
+  }
 
   return (
     <div className="space-y-5">
+      <button onClick={onBack} className="btn-ghost px-3 py-1 text-xs flex items-center gap-1">
+        <ArrowLeft size={12} /> All Tournaments
+      </button>
+
       <div>
         <label className="section-label block mb-1">Tournament Name</label>
-        <input value={form.name} onChange={(e) => setField('name', e.target.value)} className={inputCls} />
+        <input value={form.name} onChange={(e) => setField('name', e.target.value)} className={inputFull} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="section-label block mb-1">Date</label>
-          <input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)}
-            className={inputCls} />
+          <input type="date" value={form.date} onChange={(e) => setField('date', e.target.value)} className={inputFull} />
         </div>
         <div>
           <label className="section-label block mb-1">Time</label>
-          <input type="time" value={form.time} onChange={(e) => setField('time', e.target.value)}
-            className={inputCls} />
+          <input type="time" value={form.time} onChange={(e) => setField('time', e.target.value)} className={inputFull} />
         </div>
       </div>
 
       <div>
         <label className="section-label block mb-1">Location</label>
         <input value={form.location} onChange={(e) => setField('location', e.target.value)}
-          placeholder="Redemption Airsoft Field" className={inputCls} />
+          placeholder="Redemption Airsoft Field" className={inputFull} />
       </div>
 
       <div>
         <label className="section-label block mb-1">Status</label>
-        <select value={form.status} onChange={(e) => setField('status', e.target.value)} className={inputCls}>
+        <select value={form.status} onChange={(e) => setField('status', e.target.value)} className={inputFull}>
           <option value="upcoming">Upcoming</option>
           <option value="active">Active — starts Drifter clock</option>
           <option value="ended">Ended</option>
         </select>
-        {form.status === 'active' && (
+        {form.status === 'active' && initialData?.details?.status !== 'active' && (
           <p className="font-body text-gold-600 text-xs mt-1">
-            ⚠ Saving with Active status sets the tournament start time (Drifter threshold).
+            ⚠ Saving as Active records the tournament start time for the Drifter clock.
           </p>
         )}
       </div>
@@ -402,12 +413,13 @@ function TournamentPanel() {
           onChange={(e) => setField('rules', e.target.value)}
           rows={3}
           placeholder="Any special rules for this event…"
-          className={`${inputCls} resize-none`}
+          className={`${inputFull} resize-none`}
         />
       </div>
 
       <RopeDivider />
 
+      {/* Prizes — uses inputBase (no w-full) to avoid flex conflict */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="section-label">Prizes</label>
@@ -417,20 +429,23 @@ function TournamentPanel() {
         </div>
         <div className="space-y-2">
           {prizes.map((prize, i) => (
-            <div key={i} className="flex gap-2">
+            <div key={i} className="flex gap-2 items-center">
               <input
                 value={prize.title}
                 onChange={(e) => setPrize(i, 'title', e.target.value)}
-                placeholder="Title"
-                className={`${inputCls} w-28 flex-shrink-0`}
+                placeholder="Place / title"
+                className={`${inputBase} w-28 flex-shrink-0`}
               />
               <input
                 value={prize.description}
                 onChange={(e) => setPrize(i, 'description', e.target.value)}
-                placeholder="Description / value"
-                className={`${inputCls} flex-1`}
+                placeholder="Prize description"
+                className={`${inputBase} flex-1 min-w-0`}
               />
-              <button onClick={() => removePrize(i)} className="text-dust-700 hover:text-blood-400">
+              <button
+                onClick={() => removePrize(i)}
+                className="text-dust-700 hover:text-blood-400 flex-shrink-0"
+              >
                 <Trash2 size={16} />
               </button>
             </div>
@@ -438,9 +453,91 @@ function TournamentPanel() {
         </div>
       </div>
 
-      <button onClick={save} disabled={saving} className="btn-gold w-full">
-        {saving ? 'Saving…' : saved ? '✓ Saved' : tournamentId ? 'Update Tournament' : 'Create Tournament'}
+      <button onClick={save} disabled={saving || saved} className="btn-gold w-full">
+        {saving ? 'Saving…' : saved ? '✓ Saved' : isNew ? 'Create Tournament' : 'Save Changes'}
       </button>
+
+      {!isNew && (
+        <button
+          onClick={deleteTournament}
+          disabled={deleting}
+          className="w-full py-2 text-xs font-sans font-bold uppercase tracking-widest text-blood-500
+                     hover:text-blood-300 transition-colors border border-transparent hover:border-blood-800
+                     rounded-sm"
+        >
+          {deleting ? 'Deleting…' : 'Delete Tournament'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function TournamentPanel() {
+  const [tournaments, setTournaments] = useState([]);
+  const [editingId, setEditingId] = useState(null); // null = list, 'new' = new, id = edit
+
+  // Live list — only used when in list view, never interferes with edit form
+  useEffect(() => {
+    const q = query(collection(db, 'tournaments'), orderBy('details.date', 'desc'));
+    return onSnapshot(q, (snap) => {
+      setTournaments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  if (editingId !== null) {
+    const existing = editingId === 'new' ? null : tournaments.find((t) => t.id === editingId);
+    return (
+      <TournamentEdit
+        tournamentId={editingId === 'new' ? null : editingId}
+        initialData={existing ?? null}
+        onBack={() => setEditingId(null)}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <button
+        onClick={() => setEditingId('new')}
+        className="btn-gold w-full flex items-center justify-center gap-2"
+      >
+        <Plus size={16} /> New Tournament
+      </button>
+
+      {tournaments.length === 0 && (
+        <p className="font-body text-dust-600 text-sm text-center py-8 uppercase tracking-widest">
+          No tournaments yet
+        </p>
+      )}
+
+      {tournaments.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setEditingId(t.id)}
+          className="w-full bg-charcoal-800 border border-charcoal-600 hover:border-dust-500
+                     rounded-sm p-3 text-left transition-colors"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-sans font-bold text-parchment-100 text-sm uppercase tracking-wide truncate">
+                {t.details?.name ?? 'Untitled Tournament'}
+              </p>
+              <p className="font-body text-dust-500 text-xs mt-0.5">
+                {t.details?.date ?? '—'} {t.details?.time ? `· ${t.details.time}` : ''}
+                {t.details?.location ? ` · ${t.details.location}` : ''}
+              </p>
+              {t.prizes?.length > 0 && (
+                <p className="font-body text-dust-600 text-xs mt-1">
+                  {t.prizes.length} prize{t.prizes.length !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+            <span className={`flex-shrink-0 px-2 py-0.5 rounded-sm border text-[10px] font-sans font-bold uppercase tracking-widest ${statusBadge(t.details?.status)}`}>
+              {t.details?.status ?? 'upcoming'}
+            </span>
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
