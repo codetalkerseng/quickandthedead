@@ -24,12 +24,12 @@ function ClockFace({ remaining, serverOffset, tournamentTime, large }) {
   const remSec      = Math.max(0, remaining) / 1000;
   const secondAngle = remaining > 0 ? (60 - remSec % 60) * 6 : 0;
 
-  // Tournament marker angle (hour hand position of tournament start time)
+  // Marker at the minute-hand position of the next match time
   let tMarkerAngle = null;
   if (tournamentTime) {
-    const td  = new Date(tournamentTime.toMillis());
-    const th12 = (td.getHours() % 12) + td.getMinutes() / 60;
-    tMarkerAngle = th12 * 30;
+    const td     = new Date(tournamentTime.toMillis());
+    const minFrac = td.getMinutes() + td.getSeconds() / 60;
+    tMarkerAngle  = minFrac * 6; // same scale as minute hand (6° per minute)
   }
 
   const critical  = remaining < 10_000 && remaining > 0;

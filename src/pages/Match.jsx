@@ -230,7 +230,7 @@ export default function Match() {
           <CountdownClock
             scheduledTime={match.timing.scheduledTime}
             startTime={match.timing.createdAt}
-            tournamentTime={tournament?.details?.startTime ?? null}
+            tournamentTime={match.timing.scheduledTime}
             serverOffset={serverOffset}
             onPhaseChange={setPhase}
             large
