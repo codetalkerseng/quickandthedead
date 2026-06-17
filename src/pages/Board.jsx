@@ -11,7 +11,12 @@ import RopeDivider from '../components/ui/RopeDivider';
 import SheriffStar from '../components/ui/SheriffStar';
 import CrossedPistols from '../components/ui/CrossedPistols';
 import TownCrier from '../components/TownCrier';
-import { Skull, LogOut, Swords, X } from 'lucide-react';
+import { Skull, LogOut, Swords, X, Clock } from 'lucide-react';
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  return new Date(ts.toMillis()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 const DANGER_ZONE_MS = 45 * 60 * 1000;
 const DEFAULT_MATCH_DELAY_MS = 10 * 60 * 1000; // 10 min until draw
@@ -265,6 +270,44 @@ export default function Board() {
             </div>
           )}
         </div>
+
+        {/* Upcoming Duels */}
+        {activeMatches.length > 0 && (
+          <>
+            <RopeDivider />
+            <p className="section-label text-dust-500 mb-3">
+              <Clock size={11} className="inline mr-1 -mt-px" />
+              Scheduled Duels ({activeMatches.length})
+            </p>
+            <div className="space-y-2 mb-4">
+              {[...activeMatches]
+                .sort((a, b) =>
+                  (a.timing?.scheduledTime?.toMillis() ?? 0) -
+                  (b.timing?.scheduledTime?.toMillis() ?? 0)
+                )
+                .map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => navigate(`/match/${m.id}`)}
+                    className="w-full panel flex items-center gap-3 p-3 border border-charcoal-600
+                               hover:border-dust-400 text-left transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-sans font-bold text-parchment-100 text-sm uppercase tracking-wide truncate">
+                        {m.participants.challengerNickname}
+                        <span className="text-dust-600 font-normal mx-1">vs</span>
+                        {m.participants.defenderNickname}
+                      </p>
+                    </div>
+                    <span className="font-body text-gold-500 text-xs flex-shrink-0">
+                      {fmtTime(m.timing?.scheduledTime)}
+                    </span>
+                    <Swords size={12} className="text-dust-700 flex-shrink-0" />
+                  </button>
+                ))}
+            </div>
+          </>
+        )}
 
         <RopeDivider />
 
