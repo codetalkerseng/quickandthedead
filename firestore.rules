@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function isAlive() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.status == 'alive';
+    }
+
+    function ownsProfile(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Tournaments: admins write, anyone signed in reads
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Profiles: owner updates their own, everyone signed in reads active profiles
+    match /profiles/{uid} {
+      allow read: if isSignedIn();
+      allow create: if ownsProfile(uid);
+      allow update: if ownsProfile(uid) && !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['isAdmin', 'status', 'stats.matchesPlayed']);
+      // Admins can update any profile field (status, disqualify, etc.)
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Matches: alive players create, admins resolve, participants and admins read
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create: if isAlive() &&
+        request.resource.data.status == 'scheduled' &&
+        request.resource.data.participants.challengerId == request.auth.uid;
+      // Only admins may update status to resolved/cancelled or set result
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

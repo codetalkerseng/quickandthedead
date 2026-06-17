@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: theme('colors.charcoal.900');
+  }
+
+  body {
+    @apply bg-parchment-200 text-charcoal-900 font-body min-h-screen;
+    /* Subtle parchment texture via repeating gradient */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.015) 2px,
+        rgba(0, 0, 0, 0.015) 4px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 8px,
+        rgba(180, 140, 80, 0.06) 8px,
+        rgba(180, 140, 80, 0.06) 9px
+      );
+  }
+
+  h1, h2, h3 {
+    @apply font-display;
+  }
+
+  h4, h5, h6 {
+    @apply font-sans font-bold uppercase tracking-widest;
+  }
+}
+
+@layer components {
+  /* Dark wooden panel */
+  .panel {
+    @apply bg-charcoal-800 border border-charcoal-600 rounded-sm shadow-panel;
+  }
+
+  /* Parchment card */
+  .parchment-card {
+    @apply bg-parchment-100 border-2 border-dust-400 rounded-sm shadow-wanted;
+  }
+
+  /* Wanted-poster style container */
+  .wanted-frame {
+    @apply parchment-card p-4 relative;
+  }
+
+  /* Blood red danger state */
+  .danger-zone {
+    @apply border-blood-600 animate-pulse-red;
+  }
+
+  /* Gold accent button */
+  .btn-gold {
+    @apply bg-gold-500 hover:bg-gold-400 text-charcoal-900 font-sans font-bold
+           uppercase tracking-widest px-6 py-3 rounded-sm border-2 border-gold-600
+           transition-all duration-150 active:scale-95;
+  }
+
+  /* Blood red action button */
+  .btn-blood {
+    @apply bg-blood-700 hover:bg-blood-600 text-parchment-100 font-sans font-bold
+           uppercase tracking-widest px-6 py-3 rounded-sm border-2 border-blood-800
+           transition-all duration-150 active:scale-95;
+  }
+
+  /* Ghost / outline button */
+  .btn-ghost {
+    @apply bg-transparent hover:bg-charcoal-700 text-dust-300 font-sans font-bold
+           uppercase tracking-widest px-6 py-3 rounded-sm border border-dust-500
+           transition-all duration-150 active:scale-95;
+  }
+
+  /* Section divider label */
+  .section-label {
+    @apply font-sans text-xs font-bold uppercase tracking-[0.3em] text-dust-500;
+  }
+
+  /* Town Crier ticker bar */
+  .ticker-bar {
+    @apply bg-charcoal-900 border-y border-gold-600 overflow-hidden whitespace-nowrap;
+  }
+}
+
+/* Scanline overlay for dramatic effect on countdown screens */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.08) 3px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+}
