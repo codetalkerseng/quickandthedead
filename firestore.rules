@@ -26,24 +26,38 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // Profiles: owner updates their own, everyone signed in reads active profiles
+    // Profiles: owner updates their own setup fields, admins update anything
     match /profiles/{uid} {
       allow read: if isSignedIn();
       allow create: if ownsProfile(uid);
-      allow update: if ownsProfile(uid) && !request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['isAdmin', 'status', 'stats.matchesPlayed']);
-      // Admins can update any profile field (status, disqualify, etc.)
+      allow update: if ownsProfile(uid) &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['isAdmin', 'status', 'stats.matchesPlayed']);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // Matches: alive players create, admins resolve, participants and admins read
+    // Matches: alive players create; participants update only their safety flag; admins update all
     match /matches/{matchId} {
       allow read: if isSignedIn();
+
       allow create: if isAlive() &&
         request.resource.data.status == 'scheduled' &&
         request.resource.data.participants.challengerId == request.auth.uid;
-      // Only admins may update status to resolved/cancelled or set result
+
+      // Participant can flip their own safety ready flag and nothing else
+      allow update: if isSignedIn() && (
+        (resource.data.participants.challengerId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['safety']) &&
+          request.resource.data.safety.diff(resource.data.safety).affectedKeys().hasOnly(['challengerReady']) &&
+          request.resource.data.safety.challengerReady == true)
+        ||
+        (resource.data.participants.defenderId == request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['safety']) &&
+          request.resource.data.safety.diff(resource.data.safety).affectedKeys().hasOnly(['defenderReady']) &&
+          request.resource.data.safety.defenderReady == true)
+      );
+
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

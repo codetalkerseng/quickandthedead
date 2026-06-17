@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import Board from './pages/Board';
 import BootHill from './pages/BootHill';
+import Match from './pages/Match';
 import SheriffStar from './components/ui/SheriffStar';
 
 function ComingSoon({ name }) {
@@ -98,7 +99,7 @@ function AppShell() {
           path="/match/:matchId"
           element={
             <ProtectedRoute>
-              <ComingSoon name="The Duel" />
+              <Match />
             </ProtectedRoute>
           }
         />
